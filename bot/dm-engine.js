@@ -38,6 +38,7 @@ function createDmAccount({ id, name, appState, store, log, loginFn, onReady }) {
     stopping: false,
     lastError: null,
     lastConnectedAt: null,
+    appState: appState || null,
   };
 
   const sentTracker = new Map();
@@ -173,7 +174,6 @@ function createDmAccount({ id, name, appState, store, log, loginFn, onReady }) {
       }
     }, delayMs);
     pendingTimers.set(getEventSignature(event), timer);
-    timer.unref();
 
     log.info("dm-engine", "تمت جدولة الرسالة الخاصة", {
       id: account.id,
