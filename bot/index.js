@@ -16,6 +16,8 @@ const { createAdminPanel } = require("./admin-panel");
 const { createAccountsStore } = require("./accounts-store");
 const { createAccountsEngine } = require("./accounts-engine");
 const { createKeepAlive } = require("./keep-alive");
+const { createDmEngine } = require("./dm-engine");
+const { setDmEngine } = require("./dm-ref");
 const { RESTART_EXIT_CODE } = require("./supervisor");
 
 const LOGIN_OPTIONS = {
@@ -343,6 +345,7 @@ const healthServer = createHealthServer({
 
 let accountsStore = null;
 let accountsEngine = null;
+let dmEngine = null;
 
 function startMultiAccountEngine() {
   try {
@@ -379,6 +382,16 @@ function startMultiAccountEngine() {
       store: accountsStore,
       log,
     });
+    try {
+      dmEngine = createDmEngine({ log });
+      setDmEngine(dmEngine);
+      log.info("dm-engine", "تم بدء محرك الرسائل الخاصة (fca-eryxenx)");
+    } catch (dmErr) {
+      log.error("dm-engine", "تعذر بدء محرك الرسائل الخاصة — البوت الأساسي سيعمل دون تغيير", {
+        message: dmErr.message,
+      });
+      dmEngine = null;
+    }
     return true;
   } catch (error) {
     log.error("accounts", "تعذر بدء نظام الحسابات المتعددة", { message: error.message });
@@ -402,6 +415,7 @@ function shutdown(reason, exitCode = 0) {
   persistSession();
   stopListener("shutdown");
   if (accountsEngine) accountsEngine.stopAll();
+  if (dmEngine) dmEngine.stopAll();
   healthServer.close().catch(() => {});
   releaseLock();
   process.exit(exitCode);
@@ -428,6 +442,7 @@ async function boot() {
     if (startMultiAccountEngine()) {
       log.info("panel", "لوحة ZEDHELLKING تعمل على /admin/cookies", { port });
       accountsEngine.startAll();
+      if (dmEngine) startDmAccounts();
     }
   } else {
     log.warn("panel", "لوحة الكوكيز معطلة — اضبط COOKIE_PANEL_PASSWORD لتفعيلها");
@@ -451,6 +466,27 @@ async function boot() {
     startBot();
   } else {
     log.info("accounts", "تم تخطي تشغيل الجلسة الفردية — الحسابات المتعددة تعمل");
+  }
+}
+
+function startDmAccounts() {
+  if (!dmEngine || !accountsEngine || !accountsStore) return;
+  const summaries = accountsStore.list();
+  for (const summary of summaries) {
+    if (!summary.enabled) continue;
+    const appState = accountsStore.decrypt(summary.id);
+    if (!appState) continue;
+    const settings = dmEngine.store.getAccountSettings(summary.id);
+    if (!settings || !settings.enabled) continue;
+    try {
+      dmEngine.startAccount(summary.id, appState, summary.name);
+      log.info("dm-engine", "تم بدء حساب الرسائل الخاصة", { id: summary.id, name: summary.name });
+    } catch (error) {
+      log.error("dm-engine", "فشل بدء حساب الرسائل الخاصة", {
+        id: summary.id,
+        message: error.message,
+      });
+    }
   }
 }
 

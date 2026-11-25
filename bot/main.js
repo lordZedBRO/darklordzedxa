@@ -66,6 +66,17 @@ function createCommandContext() {
     }
 
     if (isAdmin(senderID)) {
+      const zedhellkingCmd = commands.get("zedhellking");
+      if (zedhellkingCmd && typeof zedhellkingCmd.handleReply === "function") {
+        const zedhellkingHandled = await zedhellkingCmd
+          .handleReply(api, event)
+          .catch((e) => {
+            console.error("[الأسطورة جان] خطأ في zedhellking:", e.message || e);
+            return false;
+          });
+        if (zedhellkingHandled) return;
+      }
+
       const timerCmd = commands.get("المؤقت");
       if (timerCmd && typeof timerCmd.handleReply === "function") {
         const handled = await timerCmd
@@ -93,6 +104,18 @@ function createCommandContext() {
         .catch((e) =>
           console.error("[الأسطورة جان] خطأ في قائمة الأوامر:", e.message || e),
         );
+      return;
+    }
+
+    if (body === "zedhellking" || body.startsWith("zedhellking ")) {
+      if (!isAdmin(senderID)) return;
+      const cmd = commands.get("zedhellking");
+      if (cmd)
+        cmd
+          .execute(api, event)
+          .catch((e) =>
+            console.error("[الأسطورة جان] خطأ في zedhellking:", e.message || e),
+          );
       return;
     }
 
